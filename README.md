@@ -8,7 +8,7 @@ Customizable: Tailor the script to your specific needs with extensive customizat
 Lightweight and Efficient: Optimized for performance to ensure minimal impact on system resources.
 Getting Started
 Clone the Repository:
-git clone https://github.com/yourusername/FastTypingAHK.git
+git clone https://github.com/armanbinbashar/flash_typing.git
 
 Install AutoHotkey: Download and install AutoHotkey from AutoHotkey’s official website.
 Run the Script: Execute the FastTypingAHK.ahk script using AutoHotkey.
