@@ -1,55 +1,75 @@
-#SingleInstance Force
+/*
+	Hotstring Support: Define custom abbreviations that automatically expand into full text, saving time and reducing typing effort.
+	Instant Command Execution: Execute AHK commands right after a hotstring is expanded, enabling complex automation workflows.
+	User-Friendly Interface: Easily manage and configure hotstrings through an intuitive graphical user interface (GUI).
+	Customizable: Tailor the script to your specific needs with extensive customization options.
+	Lightweight and Efficient: Optimized for performance to ensure minimal impact on system ress.
+	Getting Started
+	Clone the Repository:
+	git clone https://github.com/armanbinbashar/flash_typing.git
+
+	Install AutoHotkey: Download and install AutoHotkey from AutoHotkey’s official website.
+	Run the Script: Execute the FastTypingAHK.ahk script using AutoHotkey.
+	Usage
+	Define Hotstrings: Open the script and add your hotstring definitions in the specified section.
+	Execute Commands: Customize the script to execute specific AHK commands immediately after a hotstring is expanded.
+	Contributing
+	Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
+*/
+
 #NoEnv
+#SingleInstance Force
+CoordMode, Mouse, Screen
 SetWorkingDir %A_ScriptDir%
-SetTitleMatchMode, 2
 SetBatchLines, -1
+
+;_________________________________________________
 
 Menu, Tray, Icon, res/appicon.ico
 Menu, Tray, NoStandard
 Menu, Tray, Add, Show menu, menu__
-Menu, Tray, Add, Reload, reload__
 Menu, Tray, Add, Quit, Quit__
 hostStringFile := "res/hString.json"
-if FileExist(hostStringFile) {
+if FileExist(hostStringFile){
     FileRead, FileContent, %hostStringFile%
-    hStringItems := Jxon_Load(FileContent)
-} Else {
+    global hStringItems := Jxon_Load(FileContent)
+}Else{
     MsgBox, 4096,res not found!,% "hString.json not found :(", 5
 }
-
 
 Gui, Font, S8, Segoe UI
 Gui, Add, Text, xm, Hotstring Items: 
 MenuItemList =
-For Each, Item in hStringItems {
-	hotstring(":*:" . Item.hString, Func("donow").Bind(Item.eText,Item.Command),"On")
+For Each, Item in hStringItems
+{
+	hotstring(":*:" . Item.hString, Func("donow").Bind(Item.eText,Item.Command,Item.window,Item.hString),"On")
 	MenuItemList .= Item.hString "|"
 }
-Gui, Add, ListBox, xm r16 vMenuItemListBox gonIndexUpdate AltSubmit, %MenuItemList%
-Gui, Add, Text, x+10 ym w200 section, hString: 
+Gui, Add, ListBox, xm r15 vMenuItemListBox gonIndexUpdate AltSubmit, %MenuItemList%
+Gui, Add, Text, x+10 ym w200 section, hString : 
 Gui, Add, Edit, xs wp vhString
+Gui, Add, Text, xs w200 section, window : 
+Gui, Add, Edit, xs wp vwindow
 Gui, Add, Text, xs wp, Expand Text :
 Gui, Add, Edit, xs wp veText
 Gui, Add, Text, xs wp, Command :
-Gui, Add, Edit, xs wp h129 vCommand -Wrap
+Gui, Add, Edit, xs wp h60 vCommand -Wrap
 Gui, Add, Button, xs wp h30 gSave, Save
 Gui, Add, Button, xm yp w50 hp gAdd, Add
 Gui, Add, Button, x+10 yp w60 hp gRemove, Remove
 
 GuiControl, Choose, MenuItemListBox, 1
 Gosub onIndexUpdate
+Gui, Show,, ' 	flash_type
 Return
 
 
 ;______________________labels__________________________________________
 
-reload__:
-Reload
-Return
-
-:*:mnnu::
+:*:#menu::
+:*:#menü::
 menu__:
-Gui, Show,, ' 	text expander
+Gui, Show,, ' 	flash_type
 Return
 
 GuiClose:
@@ -91,7 +111,7 @@ For Each, Item in SortByKey(hStringItems, "hString")
 	If (Index = NewIndex)
 		NewIndex := Index+1
 }
-hStringItems.Push({hString: NewWord . NewIndex, Command: "", eText:""})
+hStringItems.Push({hString: NewWord . NewIndex, Command: "", eText: "", window: ""})
 Gosub HSitemListBox
 GuiControl, Choose, MenuItemListBox, % hStringItems.MaxIndex()
 Gosub onIndexUpdate
@@ -106,9 +126,10 @@ If (hString = "")
 }
 GuiControlGet, Index,, MenuItemListBox
 hStringItems[Index].hString := hString
+hStringItems[Index].window := window
 hStringItems[Index].eText := eText
 hStringItems[Index].Command := Command
-hotstring(":*:" . hStringItems[Index].hString, Func("donow").Bind(hStringItems[Index].eText,hStringItems[Index].Command),"On")
+hotstring(":*:" . hStringItems[Index].hString, Func("donow").Bind(hStringItems[Index].eText,hStringItems[Index].Command,hStringItems[Index].window,hStringItems[Index].hString),"On")
 hStringItems := SortByKey(hStringItems, "hString")
 Gosub HSitemListBox
 For Each, Item in hStringItems
@@ -134,25 +155,36 @@ Return
 onIndexUpdate:
 GuiControlGet, Index,, MenuItemListBox
 GuiControl,, hString, % hStringItems[Index].hString
+GuiControl,, window, % hStringItems[Index].window
 GuiControl,, eText, % hStringItems[Index].eText
 GuiControl,, Command, % hStringItems[Index].Command
 Return
 
 ;______________________functions defination____________________________
-
-donow(endText,ahkCommand) {
-	If (endText != "")
+donow(endText,ahkCommand,winstring,hString){
+	SetTitleMatchMode, 2
+	If (winstring != "")
 	{
-		saveClip := Clipboard
-		Clipboard := ""
-		Clipboard := endText
-		Send ^v
+		If (WinActive(winstring))
+			Send % endText
+		Else{
+			savedClip := Clipboard
+			Clipboard := ""
+			Clipboard := hString
+			Sleep, 100
+			Send, ^v
+			Sleep, 200
+			Clipboard := savedClip
+		}
+	}
+	Else if (endText != "")
+	{
+		Send % endText
 	}
 	If (ahkCommand != ""){
 		ExecScript(ahkCommand)
 	}
 	SoundPlay, res/triggered.wav
-	Clipboard := saveClip
 	return
 }
 
@@ -165,9 +197,11 @@ ExecScript(script) {
 	return exec.ProcessID
 }
 
-Jxon_Dump(obj, indent:="", lvl:=1) {
+Jxon_Dump(obj, indent:="", lvl:=1)
+{
 	static q := Chr(34) ; q = ""
-	if IsObject(obj) {
+	if IsObject(obj)
+	{
 		static Type := Func("Type")
 		if Type ? (Type.Call(obj) != "Object") : (ObjGetCapacity(obj) == "")
 			throw Exception("Object type not supported.", -1, Format("<Object at 0x{:p}>", &obj))
@@ -178,7 +212,8 @@ Jxon_Dump(obj, indent:="", lvl:=1) {
 		until !is_array
 
 		static integer := "integer"
-		if indent is %integer% {
+		if indent is %integer%
+		{
 			if (indent < 0)
 				throw Exception("Indent parameter must be a postive integer.", -1, indent)
 			spaces := indent, indent := ""
@@ -190,7 +225,8 @@ Jxon_Dump(obj, indent:="", lvl:=1) {
 			indt .= indent
 
 		lvl += 1, out := "" ; Make #Warn happy
-		for k, v in obj {
+		for k, v in obj
+		{
 			if IsObject(k) || (k == "")
 				throw Exception("Invalid object key.", -1, k ? Format("<Object at 0x{:p}>", &obj) : "<blank>")
 			
@@ -201,7 +237,8 @@ Jxon_Dump(obj, indent:="", lvl:=1) {
 			    .  ( indent ? ",`n" . indt : "," ) ; token + indent
 		}
 
-		if (out != "") {
+		if (out != "")
+		{
 			out := Trim(out, ",`n" . indent)
 			if (indent != "")
 				out := "`n" . indt . out . "`n" . SubStr(indt, StrLen(indent)+1)
@@ -278,7 +315,8 @@ GetGuiClassStyle() {
    Return ClassStyle
 }
 
-Jxon_Load(ByRef src, args*) {
+Jxon_Load(ByRef src, args*)
+{
 	static q := Chr(34)
 	key := "", is_key := false
 	stack := [ tree := [] ]
